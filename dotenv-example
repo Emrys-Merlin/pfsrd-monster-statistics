@@ -1,0 +1,5 @@
+# Save this file as '.env', if you would like to use the functionality.
+# You need to have python-dotenv installed
+
+# Path to your Pathfinder monster spreadsheet
+MONSTER_PATH = 'path/to/your/d20pfsrd-Bestiary.xlsx'
