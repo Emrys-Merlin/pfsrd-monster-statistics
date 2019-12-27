@@ -8,7 +8,7 @@ class Monsters(pd.DataFrame):
 
     During loading some additional auxiliary quantities are computed.
     '''
-    def __init__(self, path='./Kopie von d20pfsrd-Bestiary.xlsx'):
+    def __init__(self, path):
         df = pd.read_excel(path)
         super(Monsters, self).__init__(df)
         self._compute_all_ability_modifiers()
@@ -85,9 +85,9 @@ class Monsters(pd.DataFrame):
         for i, p in enumerate(self.hit_probability(ar_offsets, cr, ar_die, defense)):
             mean_dmg, var_dmg = self._expected_var_dmg(dmg_rolls[i])
 
-            yield mean_dmg*p, np.sqrt(var_dmp*p)
+            yield mean_dmg*p, np.sqrt(var_dmg*p)
 
-    def _expected_var_dmg(dmg_roll):
+    def _expected_var_dmg(self, dmg_roll):
         mean = 0.
         var = 0.
 
@@ -110,7 +110,10 @@ class Monsters(pd.DataFrame):
 
 
 if __name__ == '__main__':
-    m = Monsters()
+    from dotenv import dotenv_values
+    parsed = dotenv_values()
+    path = parsed['MONSTER_PATH']
+    m = Monsters(path)
     print(m.head())
     print(m.cr.head())
 
