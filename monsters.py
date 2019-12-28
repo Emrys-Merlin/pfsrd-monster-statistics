@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 
 from scipy.stats import norm
+from statsmodels.distributions.empirical_distribution import ECDF
 
 class Monsters(pd.DataFrame):
     '''Encapsulates the Pathfinder monster manual dataset
@@ -55,34 +56,48 @@ class Monsters(pd.DataFrame):
         self.cr = self.groupby('CR').agg(['mean', 'std'])
         self.cr = self.cr.reset_index()
 
-    def hit_probability(self, ar_offsets, cr, ar_die=20, defense='AC'):
+    def hit_probability(self, ar_offsets, cr, ar_die=20, defense='AC', use_ecdf=True):
         '''Compute the probability to hit given AR die and offset and the monster challenge rating. Optionally the used defense can be specified.
 
         :name ar_offsets: Offsets to your attack roll you want to compute the hit probability for
         :name cr: Challenge rating of monsters you want the average hit probability for
         :name ar_die: Your attack roll die. So far only a single die is supported.
         :name defense: The defense skill used. Can be 'AC' or 'cmd'.
+        :name use_exdf: If true use the empirical cumulative distribution function to compute the probabilities. Otherwise a Gaussian distribution is assumed.
         :return: Generates a probability for each offset specified
         '''
-        mean = self.cr.loc[self.cr['CR'] == cr, (defense, 'mean')].values[0]
-        std = self.cr.loc[self.cr['CR'] == cr, (defense, 'std')].values[0]
+
+        if use_ecdf:
+            cdf = ECDF(self.loc[self['CR'] == cr, defense].values)
+        else:
+            mean = self.cr.loc[self.cr['CR'] == cr, (defense, 'mean')].values[0]
+            std = self.cr.loc[self.cr['CR'] == cr, (defense, 'std')].values[0]
+            def cdf(x):
+                return norm.cdf(x, mean, std)
 
         ps = []
         for offset in ar_offsets:
             p = 0.
             for i in range(ar_die):
                 ar = i + 1 + offset
-                p += norm.cdf(ar, mean, std)/ar_die
+                p += cdf(ar)/ar_die
 
             yield p
 
-    def expected_damage(self, dmg_rolls, ar_offsets, cr, ar_die = 20, defense='AC'):
-        '''
+    def expected_damage(self, dmg_rolls, ar_offsets, cr, ar_die = 20, defense='AC', use_ecdf=True):
+        '''Computes the expected damage + standard deviation with the given attack and damage roles
 
+        :name dmg_rolls: List of damage rolls each in the form '1d10+3d6+7+8'
+        :name ar_offsets: Offsets to your attack roll you want to compute the hit probability for (Must have the same length as dmg_rolls)
+        :name cr: Challenge rating of monsters you want the average hit probability for
+        :name ar_die: Your attack roll die. So far only a single die is supported.
+        :name defense: The defense skill used. Can be 'AC' or 'cmd'.
+        :name use_exdf: If true use the empirical cumulative distribution function to compute the probabilities. Otherwise a Gaussian distribution is assumed.
+        :return: Generates the mean damage and standard deviation of damage according to the specified dice and offset
         '''
         assert len(dmg_rolls) == len(ar_offsets)
 
-        for i, p in enumerate(self.hit_probability(ar_offsets, cr, ar_die, defense)):
+        for i, p in enumerate(self.hit_probability(ar_offsets, cr, ar_die, defense, use_ecdf)):
             mean_dmg, var_dmg = self._expected_var_dmg(dmg_rolls[i])
 
             yield mean_dmg*p, np.sqrt(var_dmg*p)
